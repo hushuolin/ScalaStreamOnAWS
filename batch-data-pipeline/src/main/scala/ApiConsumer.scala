@@ -1,21 +1,20 @@
 import sttp.client3._
 import ujson._
 import org.apache.spark.sql.SparkSession
+import com.typesafe.config.ConfigFactory
 
 
 object ApiConsumer {
-  val apiEndpoint = "https://www.consumerfinance.gov/data-research/consumer-complaints/search/api/v1/"
-  val backend = HttpURLConnectionBackend()
-  var frm = 0
-  val size = 1000 // Adjust size based on API and network performance
-  val start_date = "2023-09-01" // Example start date
-  val end_date = "2023-09-02"  // Example end date
-  val spark = SparkSession.builder()
-    .appName("API Consumer with Spark")
-    .master("local[*]") // Use local in a non-clustered environment
-    .getOrCreate()
-  import spark.implicits._
+  val config = ConfigFactory.load()
 
+  val apiEndpoint = config.getString("api.endpoint")
+  val startDate = config.getString("api.startDate")
+  val endDate = config.getString("api.endDate")
+  val size = config.getInt("api.size")
+  var frm = 0  // Initialize frm if needed or fetch from config if its value changes
+
+  val sparkMaster = config.getString("spark.master")
+  val sparkAppName = config.getString("spark.appName")
   case class Complaint(
                         company: Option[String],
                         company_public_response: Option[String],
@@ -40,6 +39,11 @@ object ApiConsumer {
 
 
   def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder()
+      .appName(sparkAppName)
+      .master(sparkMaster)
+      .getOrCreate()
+
     try {
       extractData()
     } finally {
@@ -48,26 +52,30 @@ object ApiConsumer {
   }
 
   def extractData(): Unit = {
+    val backend = HttpURLConnectionBackend()
     var hasMoreData = true
     var totalRecordsExtracted = 0
 
+    // Initialize Spark session
+    val spark = SparkSession.builder()
+      .appName(sparkAppName)
+      .master(sparkMaster)
+      .getOrCreate()
+
+    import spark.implicits._  // Import implicits close to usage context
+
     while (hasMoreData) {
       val response = basicRequest
-        .get(uri"$apiEndpoint?frm=$frm&size=$size&date_received_min=$start_date&date_received_max=$end_date&product=Credit%20card")
+        .get(uri"$apiEndpoint?frm=$frm&size=$size&date_received_min=$startDate&date_received_max=$endDate&product=Credit%20card")
         .send(backend)
 
       response.body match {
         case Right(content) =>
           val data = ujson.read(content)
-          // Assuming `data` contains a JSON object with an array under "hits" -> "hits"
           val hits = data("hits")("hits")
-
-          // Print the first few elements of the array to preview their contents
           hits.arr.take(5).foreach(println)
 
-
-          val complaintsJson = data("hits")("hits").arr.map(_.obj("_source"))
-
+          val complaintsJson = hits.arr.map(_.obj("_source"))
           val complaints = complaintsJson.map { json =>
             Complaint(
               company = json.obj.get("company").flatMap(_.strOpt),
@@ -92,21 +100,15 @@ object ApiConsumer {
             )
           }.toList
 
-
           val complaintsDF = complaints.toDF()
 
-          val complaintIdDF = complaintsDF.select("complaint_id")
-
-          // Show the first 10 rows of the complaint_id column
+          // Show the first 10 rows of the DataFrame
           complaintsDF.show(10, truncate = false)
 
           val extractedRecords = complaints.size
           totalRecordsExtracted += extractedRecords
-          if (extractedRecords < size) {
-            hasMoreData = false
-          } else {
-            frm += size
-          }
+          hasMoreData = extractedRecords == size
+          frm += size
 
         case Left(error) =>
           println(s"API request failed: $error")
@@ -116,5 +118,6 @@ object ApiConsumer {
 
     println(s"Total records extracted: $totalRecordsExtracted")
   }
+
 
 }
