@@ -2,6 +2,7 @@ import sttp.client3._
 import ujson._
 import org.apache.spark.sql.SparkSession
 import com.typesafe.config.ConfigFactory
+import scala.util.{Try, Success, Failure}
 
 object ApiConsumer {
   val config = ConfigFactory.load()
@@ -52,21 +53,31 @@ object ApiConsumer {
       .getOrCreate()
 
   def fetchApiData(frm: Int, size: Int, backend: SttpBackend[Identity, Any]): Either[String, List[Complaint]] = {
-    val response = basicRequest
+    Try(basicRequest
       .get(uri"$apiEndpoint?frm=$frm&size=$size&date_received_min=$startDate&date_received_max=$endDate&product=Credit%20card")
-      .send(backend)
+      .send(backend)) match {
+      case Success(response) =>
+        response.body match {
+          case Right(content) =>
+            parseData(content)
+          case Left(error) =>
+            Left(s"API request failed: $error")
+        }
+      case Failure(exception) =>
+        Left(s"Network request failed: ${exception.getMessage}")
+    }
+  }
 
-    response.body match {
-      case Right(content) =>
-        val data = ujson.read(content)
-        // 'data' is a ujson.Value, we need to access its 'arr' field to get an array
-        val hits = data("hits")("hits").arr
-        // Map over the array, ensuring each hit is converted to a ujson.Obj before passing it to parseComplaint
-        val complaints = hits.map(hit => parseComplaint(hit("_source").obj))
-        // Convert to a list if necessary
-        Right(complaints.toList)
-      case Left(error) =>
-        Left(s"API request failed: $error")
+  def parseData(content: String): Either[String, List[Complaint]] = {
+    Try {
+      val data = ujson.read(content)
+      val hits = data("hits")("hits").arr
+      val complaints = hits.map(hit => parseComplaint(hit("_source").obj))
+      Right(complaints.toList)
+    } match {
+      case Success(result) => result
+      case Failure(exception) =>
+        Left(s"Failed to parse JSON: ${exception.getMessage}")
     }
   }
 
