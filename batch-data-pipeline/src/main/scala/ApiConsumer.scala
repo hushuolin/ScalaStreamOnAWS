@@ -122,7 +122,7 @@ object ApiConsumer {
           val complaintsDF = complaints.toDF()
           val tempPath = s"/tmp/complaints_data_$frm.parquet"
           // Write DataFrame to Parquet
-          complaintsDF.coalesce(1).write.parquet(tempPath)
+          complaintsDF.coalesce(1).write.mode("overwrite").parquet(tempPath)
 
           // Find the Parquet file and upload to S3
           val dir = new java.io.File(tempPath)
