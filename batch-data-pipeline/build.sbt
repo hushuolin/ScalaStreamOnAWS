@@ -8,12 +8,12 @@ lazy val root = (project in file("."))
   )
 
 libraryDependencies ++= Seq(
-  "com.softwaremill.sttp.client3" %% "core" % "3.5.2",  // sttp core library
-  "com.softwaremill.sttp.client3" %% "circe" % "3.5.2", // if you use circe for JSON
+  "com.softwaremill.sttp.client3" %% "core" % "3.9.5",  // sttp core library
+  "com.softwaremill.sttp.client3" %% "circe" % "3.9.5", // if you use circe for JSON
   "com.lihaoyi" %% "ujson" % "1.4.0",  // ujson for JSON parsing
-  "org.apache.spark" %% "spark-core" % "3.5.0", // Use the Spark version installed on your device
-  "org.apache.spark" %% "spark-sql" % "3.5.0",
-  "com.typesafe" % "config" % "1.4.1"
-
+  "org.apache.spark" %% "spark-core" % "3.5.1", // Use the Spark version installed on your device
+  "org.apache.spark" %% "spark-sql" % "3.5.1",
+  "com.typesafe" % "config" % "1.4.3",
+  "software.amazon.awssdk" % "s3" % "2.25.27"
 )
 

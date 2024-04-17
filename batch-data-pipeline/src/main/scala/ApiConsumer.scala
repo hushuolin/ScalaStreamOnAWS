@@ -3,12 +3,15 @@ import ujson._
 import org.apache.spark.sql.SparkSession
 import com.typesafe.config.ConfigFactory
 import scala.util.{Try, Success, Failure}
+import S3Uploader.uploadFileToS3
+
 
 object ApiConsumer {
   val config = ConfigFactory.load()
 
   // Configurations loaded from file
   val apiEndpoint = config.getString("api.endpoint")
+  val productName = config.getString("api.productName")
   val startDate = config.getString("api.startDate")
   val endDate = config.getString("api.endDate")
   val size = config.getInt("api.size")
@@ -46,15 +49,17 @@ object ApiConsumer {
     }
   }
 
-  def createSparkSession(): SparkSession =
+  def createSparkSession(): SparkSession = {
     SparkSession.builder()
       .appName(sparkAppName)
       .master(sparkMaster)
       .getOrCreate()
+  }
+
 
   def fetchApiData(frm: Int, size: Int, backend: SttpBackend[Identity, Any]): Either[String, List[Complaint]] = {
     Try(basicRequest
-      .get(uri"$apiEndpoint?frm=$frm&size=$size&date_received_min=$startDate&date_received_max=$endDate&product=Credit%20card")
+      .get(uri"$apiEndpoint?frm=$frm&size=$size&date_received_min=$startDate&date_received_max=$endDate&product=$productName")
       .send(backend)) match {
       case Success(response) =>
         response.body match {
@@ -115,7 +120,15 @@ object ApiConsumer {
       fetchApiData(frm, size, backend) match {
         case Right(complaints) =>
           val complaintsDF = complaints.toDF()
-          complaintsDF.show(10, truncate = false)
+          val tempPath = s"/tmp/complaints_data_$frm.parquet"
+          // Write DataFrame to Parquet
+          complaintsDF.coalesce(1).write.parquet(tempPath)
+
+          // Find the Parquet file and upload to S3
+          val dir = new java.io.File(tempPath)
+          val actualFile = dir.listFiles().find(_.getName.endsWith(".parquet")).get
+          uploadFileToS3("credit-card-complaints-raw-data", s"complaints/data_$frm.parquet", actualFile)
+
           val extractedRecords = complaints.size
           totalRecordsExtracted += extractedRecords
           hasMoreData = extractedRecords == size
