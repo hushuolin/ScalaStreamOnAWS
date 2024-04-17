@@ -1,0 +1,5 @@
+package streamDataPipeline
+
+object StreamConfig {
+
+}
