@@ -2,6 +2,7 @@ package batchDataPipeline
 
 import batchDataPipeline.Complaint
 import org.apache.spark.sql.{SparkSession, Dataset, Encoders}
+import org.apache.spark.sql.functions._
 import sttp.client3._
 import scala.util.{Try, Success, Failure}
 import AppConfig._
@@ -66,38 +67,40 @@ object ETL {
   )
 
   // Extract, transform, and load data
-  def extractComplaints(startDate: String, endDate: String, backend: SttpBackend[Identity, Any]): Either[String, ListBuffer[Complaint]] = {
-    val complaints = ListBuffer.empty[Complaint]
+  def extractComplaints(startDate: String, endDate: String, backend: SttpBackend[Identity, Any], spark: SparkSession): Either[String, Dataset[Complaint]] = {
+    import spark.implicits._
     val formatter = DateTimeFormatter.ISO_LOCAL_DATE
     var currentStartDate = LocalDate.parse(startDate, formatter)
     val finalEndDate = LocalDate.parse(endDate, formatter)
+
+    var allComplaints = spark.emptyDataset[Complaint]
 
     while (!currentStartDate.isAfter(finalEndDate)) {
       val currentEndDate = currentStartDate.plusDays(30).minusDays(1)
       val currentStartDateString = currentStartDate.format(formatter)
       val currentEndDateString = currentEndDate.format(formatter)
-
-      // Adjust the end date to not exceed the user-specified final end date
       val adjustedEndDateString = if (currentEndDate.isAfter(finalEndDate)) endDate else currentEndDateString
 
       fetchApiData(currentStartDateString, adjustedEndDateString, 0, 10000, backend) match {
         case Right(data) =>
-          complaints ++= data
+          val currentDataset = spark.createDataset(data) // Assuming data is Seq[Complaint]
+          val transformDataset = transformData(currentDataset)
+          allComplaints = allComplaints.union(transformDataset)
+          loadData(currentDataset, currentStartDate.toEpochDay.toInt) // Load each batch
         case Left(error) =>
           return Left(s"Error fetching data for 30-day period starting $currentStartDateString: $error")
       }
 
-      // Move the start date forward by 30 days for the next iteration
       currentStartDate = currentStartDate.plusDays(30)
     }
 
-    Right(complaints)
+    Right(allComplaints)
   }
 
   // Simple transformation function (as an example)
   def transformData(dataset: Dataset[Complaint]): Dataset[Complaint] = {
     // To be implemented to do more transformation
-    dataset.filter(_.consumer_disputed.isDefined)
+    dataset.filter(_.complaint_id.isDefined)
   }
 
   // Load data to Parquet and then upload to S3

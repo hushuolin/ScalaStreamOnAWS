@@ -10,22 +10,22 @@ object Main extends App {
     .master(AppConfig.sparkMaster)
     .getOrCreate()
 
-  try {
-    val backend = HttpURLConnectionBackend()
-    val startDate = AppConfig.startDate
-    val endDate = AppConfig.endDate
+  import spark.implicits._
 
-    val result = ETL.extractComplaints(startDate, endDate, backend)
+  val backend = HttpURLConnectionBackend()
+  val startDate = AppConfig.startDate
+  val endDate = AppConfig.endDate
 
-    // Process the result and print only the first 10 complaints
-    result match {
-      case Right(complaints) =>
-        println(s"Extracted ${complaints.size} complaints. Displaying the first 10:")
-        complaints.take(10).foreach(complaint => println(complaint.toString))
-      case Left(error) =>
-        println(s"Failed to extract data: $error")
-    }
-  } finally {
-    spark.stop()
+  // Assuming ETL is an object where extractComplaints is defined
+  val result = ETL.extractComplaints(startDate, endDate, backend, spark)
+
+  // Process the result and print only the first 10 complaints
+  result match {
+    case Right(complaintsDataset) =>
+      println(s"Extracted ${complaintsDataset.count()} complaints. Displaying the first 10:")
+      complaintsDataset.show(10, truncate = false)
+    case Left(error) =>
+      println(s"Failed to extract data: $error")
   }
+  spark.stop()
 }
