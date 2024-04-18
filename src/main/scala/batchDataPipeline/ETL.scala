@@ -6,13 +6,19 @@ import sttp.client3._
 import scala.util.{Try, Success, Failure}
 import AppConfig._
 import ujson.{Obj, Value}
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import scala.collection.mutable.ListBuffer
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
 
 object ETL {
 
   // Method to fetch data from the API
-  def fetchApiData(frm: Int, size: Int, backend: SttpBackend[Identity, Any]): Either[String, List[Complaint]] = {
+  def fetchApiData(startDate: String, endDate: String, frm: Int, pageSize: Int, backend: SttpBackend[Identity, Any]): Either[String, List[Complaint]] = {
     Try(basicRequest
-      .get(uri"$apiEndpoint?frm=$frm&size=$size&date_received_min=$startDate&date_received_max=$endDate&product=$productName")
+      .get(uri"$apiEndpoint?frm=$frm&size=$pageSize&date_received_min=$startDate&date_received_max=$endDate&product=$productName")
       .send(backend)) match {
       case Success(response) =>
         response.body match {
@@ -60,23 +66,32 @@ object ETL {
   )
 
   // Extract, transform, and load data
-  def extractData(spark: SparkSession, backend: SttpBackend[Identity, Any]): Unit = {
-    var hasMoreData = true
-    var frm = 0
+  def extractComplaints(startDate: String, endDate: String, backend: SttpBackend[Identity, Any]): Either[String, ListBuffer[Complaint]] = {
+    val complaints = ListBuffer.empty[Complaint]
+    val formatter = DateTimeFormatter.ISO_LOCAL_DATE
+    var currentStartDate = LocalDate.parse(startDate, formatter)
+    val finalEndDate = LocalDate.parse(endDate, formatter)
 
-    while (hasMoreData) {
-      fetchApiData(frm, size, backend) match {
-        case Right(complaints) =>
-          val complaintsDS = spark.createDataset(complaints)(Encoders.product[Complaint])
-          val transformed = transformData(complaintsDS)
-          loadData(transformed, frm)
-          frm += complaints.size
-          hasMoreData = complaints.size == size
+    while (!currentStartDate.isAfter(finalEndDate)) {
+      val currentEndDate = currentStartDate.plusDays(30).minusDays(1)
+      val currentStartDateString = currentStartDate.format(formatter)
+      val currentEndDateString = currentEndDate.format(formatter)
+
+      // Adjust the end date to not exceed the user-specified final end date
+      val adjustedEndDateString = if (currentEndDate.isAfter(finalEndDate)) endDate else currentEndDateString
+
+      fetchApiData(currentStartDateString, adjustedEndDateString, 0, 10000, backend) match {
+        case Right(data) =>
+          complaints ++= data
         case Left(error) =>
-          println(error)
-          hasMoreData = false
+          return Left(s"Error fetching data for 30-day period starting $currentStartDateString: $error")
       }
+
+      // Move the start date forward by 30 days for the next iteration
+      currentStartDate = currentStartDate.plusDays(30)
     }
+
+    Right(complaints)
   }
 
   // Simple transformation function (as an example)
