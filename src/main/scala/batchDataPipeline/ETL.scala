@@ -144,6 +144,17 @@ object ETL {
 
   // Load data to Parquet and then upload to S3
   def loadData(dataset: Dataset[Complaint], frm: Int): Unit = {
+    /*
+    Loads a dataset of Complaints into a temporary parquet file and uploads it to Amazon S3.
+    Parameters:
+      dataset: A Dataset[Complaint] containing complaint data.
+      frm: An integer identifier used to uniquely name the parquet file and organize the uploads.
+    Processes:
+      1. Data is coalesced into a single partition and written to a parquet file in a temporary directory.
+      2. The specific parquet file is identified and uploaded to an S3 bucket.
+    Usage:
+      This function is typically used to batch process and store large datasets in a distributed cloud storage for further analysis or backup.
+    */
     val tempPath = s"/tmp/complaints_data_$frm.parquet"
     dataset.coalesce(1).write.mode("overwrite").parquet(tempPath)
     val dir = new java.io.File(tempPath)
