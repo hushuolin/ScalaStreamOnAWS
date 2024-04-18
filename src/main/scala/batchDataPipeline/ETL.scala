@@ -18,6 +18,17 @@ object ETL {
 
   // Method to fetch data from the API
   def fetchApiData(startDate: String, endDate: String, frm: Int, pageSize: Int, backend: SttpBackend[Identity, Any]): Either[String, List[Complaint]] = {
+    /*
+     Attempts to send a GET request to the API with specified parameters.
+     Parameters:
+       startDate: A string specifying the starting date for the data request.
+       endDate: A string specifying the ending date for the data request.
+       frm: An integer representing the starting index for pagination.
+       pageSize: An integer representing the number of records per page.
+       backend: An instance of SttpBackend used to send the request.
+     Returns:
+       Either[String, List[Complaint]]: On success, returns a list of Complaint objects; on failure, returns an error message.
+    */
     Try(basicRequest
       .get(uri"$apiEndpoint?frm=$frm&size=$pageSize&date_received_min=$startDate&date_received_max=$endDate&product=$productName")
       .send(backend)) match {
@@ -32,6 +43,15 @@ object ETL {
 
   // Parse JSON data into Complaint objects
   def parseData(content: String): Either[String, List[Complaint]] = {
+
+    /*
+    Parses JSON content and converts it into a list of Complaint objects.
+    Parameters:
+      content: A String containing the JSON data.
+    Returns:
+      Either[String, List[Complaint]]: On successful parsing, returns a Right containing a list of Complaint objects.
+      On failure, returns a Left with an error message indicating the JSON parsing issue.
+    */
     Try {
       val data = ujson.read(content)
       val hits = data("hits")("hits").arr
@@ -45,6 +65,15 @@ object ETL {
 
   // Convert JSON objects to Complaint case class instances
   def parseComplaint(json: Obj): Complaint = Complaint(
+    /*
+    Parses a JSON object into a Complaint object with safely extracted optional fields.
+    Parameters:
+      json: A ujson.Obj that represents the JSON structure of a complaint record.
+    Returns:
+      A Complaint object filled with data extracted from the json object.
+    Each field in the Complaint object is extracted using flatMap to safely handle cases where the key might not exist or the type conversion is not possible, returning None in such cases.
+    Fields are extracted with strOpt for String values and boolOpt for Boolean values to ensure type safety and prevent runtime errors.
+    */
     company = json.obj.get("company").flatMap(_.strOpt),
     company_public_response = json.obj.get("company_public_response").flatMap(_.strOpt),
     company_response = json.obj.get("company_response").flatMap(_.strOpt),
