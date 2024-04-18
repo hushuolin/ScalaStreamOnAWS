@@ -1,9 +1,12 @@
-# Initial Bulk Data Load using Scala and AWS
+# Stream Data Pipeline using Scala and AWS
 
 This project focuses on the Initial Bulk Data Load phase for processing large datasets using Scala and AWS services. It outlines a comprehensive, step-by-step plan to establish a baseline of data for subsequent processing.
 
+## Architecture
+![Data Pipeline Architecture](architecture.jpg)
+
 ## Table of Contents
-- [Initial Bulk Data Load using Scala and AWS](#initial-bulk-data-load-using-scala-and-aws)
+- [Stream Data Pipeline using Scala and AWS](#initial-bulk-data-load-using-scala-and-aws)
   - [Table of Contents](#table-of-contents)
   - [Step 1: Define Data Sources and Requirements](#step-1-define-data-sources-and-requirements)
     - [Identify Data Sources](#identify-data-sources)
