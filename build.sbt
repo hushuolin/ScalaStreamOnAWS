@@ -14,6 +14,9 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % "3.5.1", // Use the Spark version installed on your device
   "org.apache.spark" %% "spark-sql" % "3.5.1",
   "com.typesafe" % "config" % "1.4.3",
-  "software.amazon.awssdk" % "s3" % "2.25.27"
+  "software.amazon.awssdk" % "s3" % "2.25.27",
+  "org.apache.spark" %% "spark-core" % "3.5.1",
+  "org.apache.spark" %% "spark-sql" % "3.5.1",
+  "org.apache.spark" %% "spark-mllib" % "3.5.1"
 )
 
