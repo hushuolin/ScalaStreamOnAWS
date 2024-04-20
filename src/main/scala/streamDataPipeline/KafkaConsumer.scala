@@ -1,5 +1,0 @@
-package streamDataPipeline
-
-object KafkaConsumer {
-
-}

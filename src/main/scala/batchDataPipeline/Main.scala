@@ -16,7 +16,6 @@ object Main extends App {
   val startDate = AppConfig.startDate
   val endDate = AppConfig.endDate
 
-  // Assuming ETL is an object where extractComplaints is defined
   val result = ETL.extractComplaints(startDate, endDate, backend, spark)
 
   // Process the result and print only the first 10 complaints

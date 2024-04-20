@@ -43,7 +43,6 @@ object ETL {
 
   // Parse JSON data into Complaint objects
   def parseData(content: String): Either[String, List[Complaint]] = {
-
     /*
     Parses JSON content and converts it into a list of Complaint objects.
     Parameters:
